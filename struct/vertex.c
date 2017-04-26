@@ -19,14 +19,10 @@ matrix applyTransformation(vertex v, matrix transformation) {
 
 vertex applyAll(vertex v, matrix mper, matrix mvv3dv) {
     matrix transformed = applyTransformation(v, identityMatrix(4));
-//    printMatrix(transformed, "transformed vertex");
     transformed = multiplyMatrixByMatrix(mper, transpose(transformed));
-//    printMatrix(transformed, "transformed by mper");
     transformed = multiplyMatrixByMatrix(mvv3dv, transformed);
-//    printMatrix(transformed, "transformed by mvv3dv2");
     v.x = transformed.values[0][0] / transformed.values[3][0];
     v.y = transformed.values[1][0] / transformed.values[3][0];
     v.z = transformed.values[2][0] / transformed.values[3][0];
-//    printf("%Lf, %Lf, %Lf\n", v.x, v.y, v.z);
     return v;
 }

@@ -5,6 +5,7 @@
 #include "util/math/mathUtils.h"
 #include "struct/vertex.h"
 #include "struct/settings.h"
+#include <math.h>
 
 void printMatrix(matrix m, const char *name) {
     printf("======%s======\n", name);
@@ -224,11 +225,16 @@ void calculateVertex(scene_settings settings) {
     vpn.values[0][0] = settings.vpn[0];
     vpn.values[0][1] = settings.vpn[1];
     vpn.values[0][2] = settings.vpn[2];
+    vpn = normalizeVector(vpn);
+    settings.vpn[0] = vpn.values[0][0];
+    settings.vpn[1] = vpn.values[0][1];
+    settings.vpn[2] = vpn.values[0][2];
 
     matrix vup = initVector(3);
     vup.values[0][0] = settings.vup[0];
     vup.values[0][1] = settings.vup[1];
     vup.values[0][2] = settings.vup[2];
+    vup = normalizeVector(vup);
 
     matrix prp = initVector(3);
     prp.values[0][0] = settings.prp[0];
@@ -236,8 +242,11 @@ void calculateVertex(scene_settings settings) {
     prp.values[0][2] = settings.prp[2];
     matrix prpH = getHomogeneousVector(prp);
 
-    long double window[] = {settings.window[0], settings.window[1], settings.window[2], settings.window[3]};
-    long double viewport[] = {settings.viewport[0], settings.viewport[1], settings.viewport[2], settings.viewport[3], settings.viewport[4], settings.viewport[5]};
+    long double window[] = {settings.window[0], settings.window[1],
+                            settings.window[2], settings.window[3]};
+    long double viewport[] = {settings.viewport[0], settings.viewport[1],
+                              settings.viewport[2], settings.viewport[3],
+                              settings.viewport[4], settings.viewport[5]};
 
     matrix rz = normalizeVector(vpn);
     matrix rx = normalizeVector(crossProduct(vup, rz));
@@ -280,7 +289,6 @@ void calculateVertex(scene_settings settings) {
     nper = multiplyMatrixByMatrix(nper, translateOriginMatrix(vrp));
 
     long double zmin = -((vrp2.values[0][2]+f)/(vrp2.values[0][2]+b));
-
 
     matrix mper = identityMatrix(4);
     mper.values[3][2] = -1;
@@ -340,75 +348,24 @@ void calculateVertex(scene_settings settings) {
 void keyboardInput(unsigned char key, int x, int y) {
     switch(key) {
         case 'q':
-            settings.vpn[0] += 0.1;
+            settings.vpn[0] = settings.vpn[0] * cos(0.1) + settings.vpn[2] * sin(0.1);
+            settings.vpn[2] = -settings.vpn[0] * sin(0.1) + settings.vpn[2] * cos(0.1);
             break;
         case 'w':
-            settings.vpn[0] -= 0.1;
-            break;
-        case 'e':
-            settings.vpn[1] += 0.1;
-            break;
-        case 'r':
-            settings.vpn[1] -= 0.1;
-            break;
-        case 't':
-            settings.vpn[2] -= -0.1;
-            break;
-        case 'y':
-            settings.vpn[2] -= 0.1;
-            break;
-        case 'a':
-            settings.vrp[0] += 0.1;
-            break;
-        case 's':
-            settings.vrp[0] -= 0.1;
-            break;
-        case 'd':
-            settings.vrp[1] += 0.1;
-            break;
-        case 'f':
-            settings.vrp[1] -= 0.1;
-            break;
-        case 'g':
-            settings.vrp[2] -= -0.1;
-            break;
-        case 'h':
-            settings.vrp[2] -= 0.1;
-            break;
-        case 'x':
-            settings.prp[0] += 0.1;
-            break;
-        case 'c':
-            settings.prp[0] -= 0.1;
-            break;
-        case 'v':
-            settings.prp[1] += 0.1;
-            break;
-        case 'b':
-            settings.prp[1] -= 0.1;
-            break;
-        case 'n':
-            settings.prp[2] -= -0.1;
-            break;
-        case 'm':
-            settings.prp[2] -= 0.1;
+            settings.vpn[0] = settings.vpn[0] * cos(-0.1) + settings.vpn[2] * sin(-0.1);
+            settings.vpn[2] = -settings.vpn[0] * sin(-0.1) + settings.vpn[2] * cos(-0.1);
             break;
 
         case 'z':
             settings.vpn[0] = 0;
             settings.vpn[1] = 0;
             settings.vpn[2] = 1;
-            settings.vrp[0] = 0;
-            settings.vrp[1] = 0;
-            settings.vrp[2] = 1;
-            settings.vrp[0] = 0;
-            settings.vrp[1] = 0;
-            settings.vrp[2] = 50;
             break;
         default:
             break;
     }
     calculateVertex(settings);
+    printf("x: %Lf, y: %Lf, z: %Lf\n", settings.vpn[0], settings.vpn[1], settings.vpn[2]);
     glutPostRedisplay();
 }
 
