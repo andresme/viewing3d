@@ -4,6 +4,7 @@
 #include <string.h>
 #include "util/math/mathUtils.h"
 #include "struct/vertex.h"
+#include "struct/settings.h"
 
 void printMatrix(matrix m, const char *name) {
     printf("======%s======\n", name);
@@ -19,7 +20,10 @@ int verticesCount;
 int facesCount;
 
 vertex *vertices;
+vertex *transformedVertices;
 polygon *faces;
+
+scene_settings settings;
 
 void reshape(int width, int height) {
     glViewport(0,0,width,height);
@@ -32,7 +36,6 @@ void reshape(int width, int height) {
 
 
 void renderScene(void) {
-
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glLineWidth(0.5);
@@ -40,9 +43,9 @@ void renderScene(void) {
     glBegin(GL_LINES);
     for(int i = 0; i < facesCount; i++) {
 
-        vertex vertex1 = vertices[faces[i].vertices[0]-1];
-        vertex vertex2 = vertices[faces[i].vertices[1]-1];
-        vertex vertex3 = vertices[faces[i].vertices[2]-1];
+        vertex vertex1 = transformedVertices[faces[i].vertices[0]-1];
+        vertex vertex2 = transformedVertices[faces[i].vertices[1]-1];
+        vertex vertex3 = transformedVertices[faces[i].vertices[2]-1];
 
         glVertex2f(vertex1.x, vertex1.y);
         glVertex2f(vertex2.x, vertex2.y);
@@ -144,7 +147,6 @@ void readFaces(polygon *faces) {
                 faces[i].vertices[2] = atoi(vertex3);
             }
             if(vertex1 == NULL || vertex2 == NULL || vertex3 == NULL) {
-                printf("something is wrong");
             }
             i++;
         }
@@ -161,18 +163,14 @@ int clipt(long double denom, long double num, long double *te, long double *tl){
         if(t > *tl) {
             return 0;
         } else if(t > *te) {
-            printf("t: %Lf\n", t);
             *te = t;
-            printf("te: %Lf\n", *te);
         }
     } else if(denom < 0) {
         t = num/ denom;
         if(t < *te) {
             return 0;
         } else {
-            printf("t: %Lf\n", t);
             *tl = t;
-            printf("tl: %Lf\n", *tl);
         }
     } else if(num > 0) {
         return 0;
@@ -188,25 +186,17 @@ void clip3d(long double *x0, long double *y0, long double *z0,
     long double dx = *x1 - *x0, dz = *z1 - *z0;
     *accept = 0;
     if(clipt(-dx -dz, *x0 + *z0, &tmin, &tmax)) {
-        printf("here1\n");
         if(clipt(dx-dz, -*x0 + *z0, &tmin, &tmax)){
-            printf("here2\n");
             long double dy = *y1 - *y0;
             if(clipt(dy-dz, -*y0 + *z0, &tmin, &tmax)){
-                printf("here3\n");
                 if(clipt(-dy-dz, *y0 + *z0, &tmin, &tmax)) {
-                    printf("here4\n");
                     if(clipt(-dz, *z0 - *zmin, &tmin, &tmax)) {
-                        printf("here5\n");
                         if(clipt(dz, -*z0 -1, &tmin, &tmax)) {
-                            printf("tmax: %Lf, tmin: %Lf\n", tmax, tmin);
                             *accept = 1;
                             if(tmax < 1.0) {
-                                printf("x: %Lf, y: %Lf, z: %Lf\n", *x1, *y1, *z1);
                                 *x1 = *x0 + tmax * dx;
                                 *y1 = *y0 + tmax * dy;
                                 *z1 = *z0 + tmax * dz;
-                                printf("x: %Lf, y: %Lf, z: %Lf\n", *x1, *y1, *z1);
                             }
                             if(tmin > 0.0) {
                                 *x0 += tmin * dx;
@@ -221,47 +211,33 @@ void clip3d(long double *x0, long double *y0, long double *z0,
     }
 }
 
+void calculateVertex(scene_settings settings) {
+    long double b = settings.b;
+    long double f = settings.f;
 
-int main(int argc, char **argv) {
-    count();
-    vertices = malloc(verticesCount * sizeof(vertex));
-    faces = malloc(facesCount * sizeof(polygon));
-    readVertex(vertices);
-    readFaces(faces);
-
-    long double b = -23;
-    long double f = 24;
     matrix vrp = initVector(3);
-    vrp.values[0][0] = 0;
-    vrp.values[0][1] = 0;
-    vrp.values[0][2] = 54;
-    matrix vrpH = getHomogeneousVector(vrp);
+    vrp.values[0][0] = settings.vrp[0];
+    vrp.values[0][1] = settings.vrp[1];
+    vrp.values[0][2] = settings.vrp[2];
 
     matrix vpn = initVector(3);
-    vpn.values[0][0] = 0;
-    vpn.values[0][1] = 0;
-    vpn.values[0][2] = 1;
-    matrix vpnH = getHomogeneousVector(vpn);
+    vpn.values[0][0] = settings.vpn[0];
+    vpn.values[0][1] = settings.vpn[1];
+    vpn.values[0][2] = settings.vpn[2];
 
     matrix vup = initVector(3);
-    vup.values[0][0] = 0;
-    vup.values[0][1] = 1;
-    vup.values[0][2] = 0;
-    matrix vupH = getHomogeneousVector(vup);
+    vup.values[0][0] = settings.vup[0];
+    vup.values[0][1] = settings.vup[1];
+    vup.values[0][2] = settings.vup[2];
 
     matrix prp = initVector(3);
-    prp.values[0][0] = 8;
-    prp.values[0][1] = 6;
-    prp.values[0][2] = 30;
+    prp.values[0][0] = settings.prp[0];
+    prp.values[0][1] = settings.prp[1];
+    prp.values[0][2] = settings.prp[2];
     matrix prpH = getHomogeneousVector(prp);
 
-    long double window[] = {-1, 1, -1, 1};
-    long double viewport[] = {0, 500, 0, 500, 0, 500};
-
-    printMatrix(vrpH, "vrpH");
-    printMatrix(translateOriginMatrix(vrp), "translate matrix");
-    matrix vrpOrigin = transpose(multiplyMatrixByMatrix(translateOriginMatrix(vrp), transpose(vrpH)));
-    printMatrix(vrpOrigin,"origin vrp");
+    long double window[] = {settings.window[0], settings.window[1], settings.window[2], settings.window[3]};
+    long double viewport[] = {settings.viewport[0], settings.viewport[1], settings.viewport[2], settings.viewport[3], settings.viewport[4], settings.viewport[5]};
 
     matrix rz = normalizeVector(vpn);
     matrix rx = normalizeVector(crossProduct(vup, rz));
@@ -276,32 +252,20 @@ int main(int argc, char **argv) {
     }
     r.values[3][3] = 1;
 
-    printMatrix(rx, "rx");
-    printMatrix(ry, "ry");
-    printMatrix(rz, "rz");
-    printMatrix(r, "r");
-
-    matrix prpOrigin = transpose(multiplyMatrixByMatrix(translateOriginMatrix(prp), transpose(prpH)));
-    printMatrix(prpOrigin, "prp Origin");
-
     matrix cw = initVector(4);
     cw.values[0][0] = (window[1] + window[0])/2.0;
     cw.values[0][1] = (window[3] + window[2])/2.0;
     cw.values[0][2] = 0;
     cw.values[0][3] = 1;
-    printMatrix(cw, "cw");
     matrix dop = substract(cw, prpH);
-    printMatrix(dop, "dop");
 
     matrix sh = dopShearMatrix(dop);
-    printMatrix(sh, "sh");
 
     matrix weird = initMatrix(4, 1);
     weird.values[3][0] = 1;
 
     matrix temp = multiplyMatrixByMatrix(sh, translateOriginMatrix(prp));
     matrix vrp2 = multiplyMatrixByMatrix(temp, weird);
-    printMatrix(vrp2, "vrp'");
 
     matrix sper = initVector(4);
 
@@ -309,28 +273,18 @@ int main(int argc, char **argv) {
     sper.values[0][1] = 2*vrp2.values[2][0]/((window[3] - window[2]) * (vrp2.values[2][0] + b));
     sper.values[0][2] = -1/(vrp2.values[2][0] + b);
     sper = scaleMatrix(sper);
-    printMatrix(sper, "Sper");
 
     matrix nper = multiplyMatrixByMatrix(sper, sh);
-    printMatrix(nper, "nper1");
     nper = multiplyMatrixByMatrix(nper, translateOriginMatrix(prp));
-    printMatrix(nper, "nper2");
     nper = multiplyMatrixByMatrix(nper, r);
-    printMatrix(nper, "nper3");
     nper = multiplyMatrixByMatrix(nper, translateOriginMatrix(vrp));
-    printMatrix(nper, "nper4");
 
-    long double zproj = -(vrp2.values[0][2]/(vrp2.values[0][2]+b));
     long double zmin = -((vrp2.values[0][2]+f)/(vrp2.values[0][2]+b));
-    long double zmax = -((vrp2.values[0][2]+b)/(vrp2.values[0][2]+b));
 
-    printf("zproj: %Lf, zmin: %Lf, zmax: %Lf\n", zproj, zmin, zmax);
 
     matrix mper = identityMatrix(4);
     mper.values[3][2] = -1;
     mper.values[3][3] = 0;
-    printMatrix(mper, "mper");
-    
 
     matrix svv3dvTemp = initVector(3);
     svv3dvTemp.values[0][0] = (viewport[1] - viewport[0])/2;
@@ -351,20 +305,18 @@ int main(int argc, char **argv) {
     matrix translateCornerMatrix = translate(translateCorner);
 
     matrix mvv3dv = multiplyMatrixByMatrix(translateViewPortMatrix, svv3dv);
-    printMatrix(mvv3dv, "mvv3dv1");
     mvv3dv = multiplyMatrixByMatrix(mvv3dv, translateCornerMatrix);
-    printMatrix(mvv3dv, "mvv3dv2");
 
     for(int i = 0; i < verticesCount; i++) {
         matrix step_2 = applyTransformation(vertices[i], nper);
-        vertices[i].x = step_2.values[0][0];
-        vertices[i].y = step_2.values[0][1];
-        vertices[i].z = step_2.values[0][2];
+        transformedVertices[i].x = step_2.values[0][0];
+        transformedVertices[i].y = step_2.values[0][1];
+        transformedVertices[i].z = step_2.values[0][2];
     }
     for(int i = 0; i < facesCount; i++){
-        vertex vertex1 = vertices[faces[i].vertices[0]-1];
-        vertex vertex2 = vertices[faces[i].vertices[1]-1];
-        vertex vertex3 = vertices[faces[i].vertices[2]-1];
+        vertex vertex1 = transformedVertices[faces[i].vertices[0]-1];
+        vertex vertex2 = transformedVertices[faces[i].vertices[1]-1];
+        vertex vertex3 = transformedVertices[faces[i].vertices[2]-1];
         int accept1 = 0;
         int accept2 = 0;
         int accept3 = 0;
@@ -380,15 +332,120 @@ int main(int argc, char **argv) {
 
     }
     for(int i = 0; i < verticesCount; i++) {
-        vertices[i] = applyAll(vertices[i], mper, mvv3dv);
+        transformedVertices[i] = applyAll(transformedVertices[i], mper, mvv3dv);
     }
+}
+
+
+void keyboardInput(unsigned char key, int x, int y) {
+    switch(key) {
+        case 'q':
+            settings.vpn[0] += 0.1;
+            break;
+        case 'w':
+            settings.vpn[0] -= 0.1;
+            break;
+        case 'e':
+            settings.vpn[1] += 0.1;
+            break;
+        case 'r':
+            settings.vpn[1] -= 0.1;
+            break;
+        case 't':
+            settings.vpn[2] -= -0.1;
+            break;
+        case 'y':
+            settings.vpn[2] -= 0.1;
+            break;
+        case 'a':
+            settings.vrp[0] += 0.1;
+            break;
+        case 's':
+            settings.vrp[0] -= 0.1;
+            break;
+        case 'd':
+            settings.vrp[1] += 0.1;
+            break;
+        case 'f':
+            settings.vrp[1] -= 0.1;
+            break;
+        case 'g':
+            settings.vrp[2] -= -0.1;
+            break;
+        case 'h':
+            settings.vrp[2] -= 0.1;
+            break;
+        case 'x':
+            settings.prp[0] += 0.1;
+            break;
+        case 'c':
+            settings.prp[0] -= 0.1;
+            break;
+        case 'v':
+            settings.prp[1] += 0.1;
+            break;
+        case 'b':
+            settings.prp[1] -= 0.1;
+            break;
+        case 'n':
+            settings.prp[2] -= -0.1;
+            break;
+        case 'm':
+            settings.prp[2] -= 0.1;
+            break;
+
+        case 'z':
+            settings.vpn[0] = 0;
+            settings.vpn[1] = 0;
+            settings.vpn[2] = 1;
+            settings.vrp[0] = 0;
+            settings.vrp[1] = 0;
+            settings.vrp[2] = 1;
+            settings.vrp[0] = 0;
+            settings.vrp[1] = 0;
+            settings.vrp[2] = 50;
+            break;
+        default:
+            break;
+    }
+    calculateVertex(settings);
+    glutPostRedisplay();
+}
+
+int main(int argc, char **argv) {
+    count();
+    vertices = malloc(verticesCount * sizeof(vertex));
+    transformedVertices = malloc(verticesCount * sizeof(vertex));
+    faces = malloc(facesCount * sizeof(polygon));
+    readVertex(vertices);
+    readFaces(faces);
+
+    settings.b = -1;
+    settings.f = 1;
+    long double vrp[] = {0,0,0};
+    settings.vrp = createVector(vrp, 3);
+    long double vpn[] = {0,0,1};
+    settings.vpn = createVector(vpn, 3);
+    long double vup[] = {0,1,0};
+    settings.vup = createVector(vup, 3);
+    long double prp[] = {0,0,50};
+    settings.prp = createVector(prp, 3);
+
+    long double window[] = {-50, 50, -50, 50};
+    settings.window = createVector(window, 4);
+    long double viewport[] = {0, 500, 0, 500, 0, 500};
+    settings.viewport = createVector(viewport, 6);
+
+
+    calculateVertex(settings);
 
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
     glutInitWindowPosition(100,100);
-    glutInitWindowSize(viewport[1],viewport[3]);
+    glutInitWindowSize(settings.viewport[1],settings.viewport[3]);
     glutCreateWindow("Drawing Polygons");
     glutDisplayFunc(renderScene);
+    glutKeyboardFunc(keyboardInput);
     glutReshapeFunc(reshape);
 
     glutMainLoop();
