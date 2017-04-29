@@ -350,16 +350,38 @@ void keyboardInput(unsigned char key, int x, int y) {
         case 'q':
             settings.vpn[0] = settings.vpn[0] * cos(0.1) + settings.vpn[2] * sin(0.1);
             settings.vpn[2] = -settings.vpn[0] * sin(0.1) + settings.vpn[2] * cos(0.1);
+            settings.vrp[0] = settings.vrp[0] * cos(0.1) + settings.vrp[2] * sin(0.1);
+            settings.vrp[2] = -settings.vrp[0] * sin(0.1) + settings.vrp[2] * cos(0.1);
             break;
         case 'w':
             settings.vpn[0] = settings.vpn[0] * cos(-0.1) + settings.vpn[2] * sin(-0.1);
             settings.vpn[2] = -settings.vpn[0] * sin(-0.1) + settings.vpn[2] * cos(-0.1);
+            settings.vrp[0] = settings.vrp[0] * cos(-0.1) + settings.vrp[2] * sin(-0.1);
+            settings.vrp[2] = -settings.vrp[0] * sin(-0.1) + settings.vrp[2] * cos(-0.1);
             break;
-
+/*
+ *  |cos θ   −sin θ   0| |x|   |x cos θ − y sin θ|   |x'|
+    |sin θ    cos θ   0| |y| = |x sin θ + y cos θ| = |y'|
+    |  0       0      1| |z|   |        z        |   |z'|
+ */
+        case 'a':
+            settings.vup[0] = settings.vup[0] * cos(0.1) - settings.vup[1] * sin(0.1);
+            settings.vup[1] = settings.vup[0] * sin(0.1) + settings.vup[1] * cos(0.1);
+            break;
+        case 's':
+            settings.vup[0] = settings.vup[0] * cos(-0.1) - settings.vup[1] * sin(-0.1);
+            settings.vup[1] = settings.vup[0] * sin(-0.1) + settings.vup[1] * cos(-0.1);
+            break;
         case 'z':
             settings.vpn[0] = 0;
             settings.vpn[1] = 0;
             settings.vpn[2] = 1;
+            settings.vrp[0] = 0;
+            settings.vrp[1] = 0;
+            settings.vrp[2] = 50;
+            settings.vup[0] = 0;
+            settings.vup[1] = 1;
+            settings.vup[2] = 0;
             break;
         default:
             break;
@@ -379,7 +401,7 @@ int main(int argc, char **argv) {
 
     settings.b = -1;
     settings.f = 1;
-    long double vrp[] = {0,0,0};
+    long double vrp[] = {0,0,50};
     settings.vrp = createVector(vrp, 3);
     long double vpn[] = {0,0,1};
     settings.vpn = createVector(vpn, 3);
