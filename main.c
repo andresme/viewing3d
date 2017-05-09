@@ -68,7 +68,7 @@ void count() {
     verticesCount = 0;
     facesCount = 0;
 
-    fp = fopen("/home/andres/CG/Polygons/config/poly.tri", "r");
+    fp = fopen("/home/andres/viewing3d/config/poly.tri", "r");
     if (fp == NULL)
         exit(EXIT_FAILURE);
 
@@ -91,7 +91,7 @@ void readVertex(vertex *vertices) {
     char *vertexDefinition;
     int i = 0;
 
-    fp = fopen("/home/andres/CG/Polygons/config/poly.tri", "r");
+    fp = fopen("/home/andres/viewing3d/config/poly.tri", "r");
     if (fp == NULL)
         exit(EXIT_FAILURE);
 
@@ -122,7 +122,7 @@ void readFaces(polygon *faces) {
     char *vertex3;
     int i = 0;
 
-    fp = fopen("/home/andres/CG/Polygons/config/poly.tri", "r");
+    fp = fopen("/home/andres/viewing3d/config/poly.tri", "r");
     if (fp == NULL)
         exit(EXIT_FAILURE);
 
@@ -359,11 +359,12 @@ void keyboardInput(unsigned char key, int x, int y) {
             settings.vrp[0] = settings.vrp[0] * cos(-0.1) + settings.vrp[2] * sin(-0.1);
             settings.vrp[2] = -settings.vrp[0] * sin(-0.1) + settings.vrp[2] * cos(-0.1);
             break;
-/*
- *  |cos θ   −sin θ   0| |x|   |x cos θ − y sin θ|   |x'|
-    |sin θ    cos θ   0| |y| = |x sin θ + y cos θ| = |y'|
-    |  0       0      1| |z|   |        z        |   |z'|
- */
+        case 'y':
+            settings.vrp[2] -= 1;
+            break;
+        case 'u':
+            settings.vrp[2] += 1;
+            break;
         case 'a':
             settings.vup[0] = settings.vup[0] * cos(0.1) - settings.vup[1] * sin(0.1);
             settings.vup[1] = settings.vup[0] * sin(0.1) + settings.vup[1] * cos(0.1);
@@ -387,7 +388,6 @@ void keyboardInput(unsigned char key, int x, int y) {
             break;
     }
     calculateVertex(settings);
-    printf("x: %Lf, y: %Lf, z: %Lf\n", settings.vpn[0], settings.vpn[1], settings.vpn[2]);
     glutPostRedisplay();
 }
 
@@ -431,5 +431,3 @@ int main(int argc, char **argv) {
 
     return 0;
 }
-
-
