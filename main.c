@@ -7,6 +7,10 @@
 #include "struct/settings.h"
 #include <math.h>
 
+
+long double WHITE[] = {1, 1, 1};
+long double BLACK[] = {0, 0, 0};
+
 void printMatrix(matrix m, const char *name) {
     printf("======%s======\n", name);
     for(int i = 0; i < m.height; i++) {
@@ -20,13 +24,84 @@ void printMatrix(matrix m, const char *name) {
 int verticesCount;
 int facesCount;
 
+long double frameBuffer[500][500][3];
+
 vertex *vertices;
 vertex *transformedVertices;
 polygon *faces;
 
 scene_settings settings;
 
+
+void clearBuffer() {
+    for(int i = 0; i < 500; i++) {
+        for(int j = 0; j < 500; j++) {
+            frameBuffer[i][j][0] = BLACK[0];
+            frameBuffer[i][j][1] = BLACK[1];
+            frameBuffer[i][j][2] = BLACK[2];
+        }
+    }
+}
+
+void draw_pixel(int x, int y, long double color[]) {
+    frameBuffer[x][y][0] = color[0];
+    frameBuffer[x][y][1] = color[1];
+    frameBuffer[x][y][2] = color[2];
+}
+
+void bres(long double x1,long double y1,long double x2,long double y2) {
+    int dx, dy, i, e;
+    int incx, incy, inc1, inc2;
+    int x,y;
+
+    dx = x2 - x1;
+    dy = y2 - y1;
+
+    if(dx < 0) dx = -dx;
+    if(dy < 0) dy = -dy;
+    incx = 1;
+    if(x2 < x1) incx = -1;
+    incy = 1;
+    if(y2 < y1) incy = -1;
+    x=x1;
+    y=y1;
+
+    if(dx > dy) {
+        draw_pixel(x,y, WHITE);
+        e = 2*dy - dx;
+        inc1 = 2*( dy -dx);
+        inc2 = 2*dy;
+        for(i = 0; i < dx; i++) {
+            if(e >= 0) {
+                y += incy;
+                e += inc1;
+            }
+            else {
+                e += inc2;
+            }
+            x += incx;
+            draw_pixel(x,y, WHITE);
+        }
+    } else {
+        draw_pixel(x,y, WHITE);
+        e = 2*dx - dy;
+        inc1 = 2*( dx - dy);
+        inc2 = 2*dx;
+        for(i = 0; i < dy; i++) {
+            if(e >= 0) {
+                x += incx;
+                e += inc1;
+            } else{
+                e += inc2;
+            }
+            y += incy;
+            draw_pixel(x,y, WHITE);
+        }
+    }
+}
+
 void reshape(int width, int height) {
+    glClearColor(0.0, 0.0, 0.0, 0.0);
     glViewport(0,0,width,height);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -35,27 +110,18 @@ void reshape(int width, int height) {
     glLoadIdentity();
 }
 
-
 void renderScene(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glLineWidth(0.5);
-    glColor3f(1.0, 1.0, 1.0);
-    glBegin(GL_LINES);
-    for(int i = 0; i < facesCount; i++) {
-
-        vertex vertex1 = transformedVertices[faces[i].vertices[0]-1];
-        vertex vertex2 = transformedVertices[faces[i].vertices[1]-1];
-        vertex vertex3 = transformedVertices[faces[i].vertices[2]-1];
-
-        glVertex2f(vertex1.x, vertex1.y);
-        glVertex2f(vertex2.x, vertex2.y);
-
-        glVertex2f(vertex2.x, vertex2.y);
-        glVertex2f(vertex3.x, vertex3.y);
-
-        glVertex2f(vertex3.x, vertex3.y);
-        glVertex2f(vertex1.x, vertex1.y);
+    glPointSize(1.0);
+    glBegin(GL_POINTS);
+    for(int i = 0; i < 500; i++) {
+        for(int j = 0; j < 500; j++) {
+            if(frameBuffer[i][j][0] != 0) {
+                glColor3f(frameBuffer[i][j][0], frameBuffer[i][j][1], frameBuffer[i][j][2]);
+                glVertex2i(i, j);
+            }
+        }
     }
     glEnd();
     glutSwapBuffers();
@@ -213,6 +279,7 @@ void clip3d(long double *x0, long double *y0, long double *z0,
 }
 
 void calculateVertex(scene_settings settings) {
+    clearBuffer();
     long double b = settings.b;
     long double f = settings.f;
 
@@ -341,6 +408,17 @@ void calculateVertex(scene_settings settings) {
     }
     for(int i = 0; i < verticesCount; i++) {
         transformedVertices[i] = applyAll(transformedVertices[i], mper, mvv3dv);
+    }
+
+    for(int i = 0; i < facesCount; i++) {
+        vertex vertex1 = transformedVertices[faces[i].vertices[0]-1];
+        vertex vertex2 = transformedVertices[faces[i].vertices[1]-1];
+        vertex vertex3 = transformedVertices[faces[i].vertices[2]-1];
+
+        bres(vertex1.x, vertex1.y, vertex2.x, vertex2.y);
+        bres(vertex2.x, vertex2.y, vertex3.x, vertex3.y);
+        bres(vertex3.x, vertex3.y, vertex1.x, vertex1.y);
+
     }
 }
 
