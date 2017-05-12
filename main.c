@@ -6,6 +6,7 @@
 #include "struct/vertex.h"
 #include "struct/settings.h"
 #include <math.h>
+#include <values.h>
 
 
 long double WHITE[] = {1, 1, 1};
@@ -25,6 +26,7 @@ int verticesCount;
 int facesCount;
 
 long double frameBuffer[500][500][3];
+long double zbuffer[500][500];
 
 vertex *vertices;
 vertex *transformedVertices;
@@ -32,6 +34,7 @@ polygon *faces;
 
 scene_settings settings;
 
+void bres(long double x1,long double y1,long double z1, long double x2,long double y2,long double z2);
 
 void clearBuffer() {
     for(int i = 0; i < 500; i++) {
@@ -39,20 +42,133 @@ void clearBuffer() {
             frameBuffer[i][j][0] = BLACK[0];
             frameBuffer[i][j][1] = BLACK[1];
             frameBuffer[i][j][2] = BLACK[2];
+            zbuffer[i][j] = -INFINITY;
         }
     }
 }
 
-void draw_pixel(int x, int y, long double color[]) {
-    frameBuffer[x][y][0] = color[0];
-    frameBuffer[x][y][1] = color[1];
-    frameBuffer[x][y][2] = color[2];
+void draw_pixel(int x, int y, int z, long double color[]) {
+    if(x >= 0 && x <= 500 && y >= 0 && y <= 500) {
+        if(z > zbuffer[x][y]){
+            frameBuffer[x][y][0] = color[0];
+            frameBuffer[x][y][1] = color[1];
+            frameBuffer[x][y][2] = color[2];
+            zbuffer[x][y] = z;
+        }
+
+    }
 }
 
-void bres(long double x1,long double y1,long double x2,long double y2) {
+vertex* getOrderedVertices(vertex vertex1, vertex vertex2, vertex vertex3) {
+    vertex* result = malloc(3 * sizeof(vertex));
+
+    if(vertex1.y < vertex2.y) {
+        if(vertex1.y < vertex3.y) {
+            result[0] = vertex1;
+            if(vertex2.y < vertex3.y) {
+                result[1] = vertex2;
+                result[2] = vertex3;
+            } else {
+                result[1] = vertex3;
+                result[2] = vertex2;
+            }
+        } else {
+            result[0] = vertex3;
+            result[1] = vertex1;
+            result[2] = vertex2;
+        }
+    } else if(vertex2.y < vertex3.y) {
+        result[0] = vertex2;
+        if(vertex1.y < vertex3.y) {
+            result[1] = vertex1;
+            result[2] = vertex3;
+        } else {
+            result[1] = vertex3;
+            result[2] = vertex1;
+        }
+    } else {
+        result[0] = vertex3;
+        result[1] = vertex2;
+        result[2] = vertex1;
+    }
+
+    return result;
+}
+
+void drawBottom(vertex v1, vertex v2, vertex v3) {
+    long double invslope1 = (v2.x - v1.x) / (v2.y - v1.y);
+    long double invslope2 = (v3.x - v1.x) / (v3.y - v1.y);
+
+    long double curx1 = v1.x;
+    long double curx2 = v1.x;
+
+    long double curz1 = v1.z;
+    long double curz2 = v1.z;
+
+    long double z_inc_left = (v2.z - v1.z)/(v2.y - v1.y);
+    long double z_inc_right = (v3.z - v1.z)/(v3.y - v1.y);
+
+    for (long double scanlineY = v1.y; scanlineY <= v2.y; scanlineY++)
+    {
+        bres(curx1, scanlineY, curz1, curx2, scanlineY, curz2);
+        curx1 += invslope1;
+        curx2 += invslope2;
+
+        curz1 += z_inc_left;
+        curz2 += z_inc_right;
+    }
+}
+
+void drawTop(vertex v1, vertex v2, vertex v3) {
+    long double invslope1 = (v3.x - v1.x) / (v3.y - v1.y);
+    long double invslope2 = (v3.x - v2.x) / (v3.y - v2.y);
+
+    long double curx1 = v3.x;
+    long double curx2 = v3.x;
+
+    long double curz1 = v3.z;
+    long double curz2 = v3.z;
+
+    long double z_inc_left = (v1.z - v3.z)/(v1.y - v3.y);
+    long double z_inc_right = (v2.z - v3.z)/(v2.y - v3.y);
+
+    for (long double scanlineY = v3.y; scanlineY > v1.y; scanlineY--) {
+        bres(curx1, scanlineY, curz1, curx2, scanlineY, curz2);
+        curx1 -= invslope1;
+        curx2 -= invslope2;
+
+        curz1 += z_inc_left;
+        curz2 += z_inc_right;
+    }
+}
+
+void drawTriangle(vertex vertex1, vertex vertex2, vertex vertex3) {
+    vertex* ordered = getOrderedVertices(vertex1, vertex2, vertex3);
+
+    if(ordered[1].y == ordered[2].y) {
+
+    } else if(ordered[0].y == ordered[1].y) {
+
+    } else {
+        vertex vertex4 = {(ordered[0].x + ((ordered[1].y - ordered[0].y) / (ordered[2].y - ordered[0].y)) * (ordered[2].x - ordered[0].x)),
+                          ordered[1].y,
+                          (ordered[0].z*(ordered[2].y - ordered[1].y) + ordered[2].z*(ordered[1].y-ordered[0].y))/(ordered[2].y - ordered[0].y)};
+
+        drawBottom(ordered[0], ordered[1], vertex4);
+        drawTop(ordered[1], vertex4, ordered[2]);
+
+    }
+
+}
+
+int interpolate(long double x, long double x0, long double x1, long double y0, long double y1) {
+    return (int)((y0*(x1-x)+y1*(x-x0))/(x1-x0));
+}
+
+void bres(long double x1,long double y1,long double z1, long double x2,long double y2,long double z2) {
     int dx, dy, i, e;
     int incx, incy, inc1, inc2;
-    int x,y;
+    int x,y,z;
 
     dx = x2 - x1;
     dy = y2 - y1;
@@ -67,7 +183,7 @@ void bres(long double x1,long double y1,long double x2,long double y2) {
     y=y1;
 
     if(dx > dy) {
-        draw_pixel(x,y, WHITE);
+        draw_pixel(x,y, interpolate(x, x1, x2, z1, z2), WHITE);
         e = 2*dy - dx;
         inc1 = 2*( dy -dx);
         inc2 = 2*dy;
@@ -80,10 +196,10 @@ void bres(long double x1,long double y1,long double x2,long double y2) {
                 e += inc2;
             }
             x += incx;
-            draw_pixel(x,y, WHITE);
+            draw_pixel(x,y, interpolate(x, x1, x2, z1, z2), WHITE);
         }
     } else {
-        draw_pixel(x,y, WHITE);
+        draw_pixel(x,y, interpolate(x, x1, x2, z1, z2), WHITE);
         e = 2*dx - dy;
         inc1 = 2*( dx - dy);
         inc2 = 2*dx;
@@ -95,7 +211,7 @@ void bres(long double x1,long double y1,long double x2,long double y2) {
                 e += inc2;
             }
             y += incy;
-            draw_pixel(x,y, WHITE);
+            draw_pixel(x,y, interpolate(x, x1, x2, z1, z2), WHITE);
         }
     }
 }
@@ -113,7 +229,7 @@ void reshape(int width, int height) {
 void renderScene(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glPointSize(1.0);
+    glPointSize(2.0);
     glBegin(GL_POINTS);
     for(int i = 0; i < 500; i++) {
         for(int j = 0; j < 500; j++) {
@@ -292,10 +408,6 @@ void calculateVertex(scene_settings settings) {
     vpn.values[0][0] = settings.vpn[0];
     vpn.values[0][1] = settings.vpn[1];
     vpn.values[0][2] = settings.vpn[2];
-    vpn = normalizeVector(vpn);
-    settings.vpn[0] = vpn.values[0][0];
-    settings.vpn[1] = vpn.values[0][1];
-    settings.vpn[2] = vpn.values[0][2];
 
     matrix vup = initVector(3);
     vup.values[0][0] = settings.vup[0];
@@ -415,10 +527,11 @@ void calculateVertex(scene_settings settings) {
         vertex vertex2 = transformedVertices[faces[i].vertices[1]-1];
         vertex vertex3 = transformedVertices[faces[i].vertices[2]-1];
 
-        bres(vertex1.x, vertex1.y, vertex2.x, vertex2.y);
-        bres(vertex2.x, vertex2.y, vertex3.x, vertex3.y);
-        bres(vertex3.x, vertex3.y, vertex1.x, vertex1.y);
+        bres(vertex1.x, vertex1.y, vertex1.z, vertex2.x, vertex2.y, vertex2.z);
+        bres(vertex2.x, vertex2.y, vertex2.z, vertex3.x, vertex3.y, vertex3.z);
+        bres(vertex3.x, vertex3.y, vertex3.z, vertex1.x, vertex1.y, vertex1.z);
 
+        drawTriangle(vertex1, vertex2, vertex3);
     }
 }
 
