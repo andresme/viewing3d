@@ -18,11 +18,12 @@ matrix applyTransformation(vertex v, matrix transformation) {
 }
 
 vertex applyAll(vertex v, matrix mper, matrix mvv3dv) {
-    matrix transformed = applyTransformation(v, identityMatrix(4));
-    transformed = multiplyMatrixByMatrix(mper, transpose(transformed));
+    matrix transformed = transpose(applyTransformation(v, identityMatrix(4)));
+    transformed = multiplyMatrixByMatrix(mper, transformed);
+
     transformed = multiplyMatrixByMatrix(mvv3dv, transformed);
     v.x = transformed.values[0][0] / transformed.values[3][0];
     v.y = transformed.values[1][0] / transformed.values[3][0];
-    v.z = transformed.values[2][0] / transformed.values[3][0];
+    v.z = -transformed.values[3][0] * mvv3dv.values[2][3];
     return v;
 }

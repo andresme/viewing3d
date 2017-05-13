@@ -34,7 +34,7 @@ polygon *faces;
 
 scene_settings settings;
 
-void bres(long double x1,long double y1,long double z1, long double x2,long double y2,long double z2);
+void bres(long double x1,long double y1,long double z1, long double x2,long double y2,long double z2, long double color[]);
 
 void clearBuffer() {
     for(int i = 0; i < 500; i++) {
@@ -47,7 +47,7 @@ void clearBuffer() {
     }
 }
 
-void draw_pixel(int x, int y, int z, long double color[]) {
+void draw_pixel(int x, int y, long double z, long double color[]) {
     if(x >= 0 && x <= 500 && y >= 0 && y <= 500) {
         if(z > zbuffer[x][y]){
             frameBuffer[x][y][0] = color[0];
@@ -95,7 +95,7 @@ vertex* getOrderedVertices(vertex vertex1, vertex vertex2, vertex vertex3) {
     return result;
 }
 
-void drawBottom(vertex v1, vertex v2, vertex v3) {
+void drawBottom(vertex v1, vertex v2, vertex v3, long double color[]) {
     long double invslope1 = (v2.x - v1.x) / (v2.y - v1.y);
     long double invslope2 = (v3.x - v1.x) / (v3.y - v1.y);
 
@@ -110,7 +110,7 @@ void drawBottom(vertex v1, vertex v2, vertex v3) {
 
     for (long double scanlineY = v1.y; scanlineY <= v2.y; scanlineY++)
     {
-        bres(curx1, scanlineY, curz1, curx2, scanlineY, curz2);
+        bres(curx1, scanlineY, curz1, curx2, scanlineY, curz2, color);
         curx1 += invslope1;
         curx2 += invslope2;
 
@@ -119,7 +119,7 @@ void drawBottom(vertex v1, vertex v2, vertex v3) {
     }
 }
 
-void drawTop(vertex v1, vertex v2, vertex v3) {
+void drawTop(vertex v1, vertex v2, vertex v3, long double color[]) {
     long double invslope1 = (v3.x - v1.x) / (v3.y - v1.y);
     long double invslope2 = (v3.x - v2.x) / (v3.y - v2.y);
 
@@ -133,7 +133,7 @@ void drawTop(vertex v1, vertex v2, vertex v3) {
     long double z_inc_right = (v2.z - v3.z)/(v2.y - v3.y);
 
     for (long double scanlineY = v3.y; scanlineY > v1.y; scanlineY--) {
-        bres(curx1, scanlineY, curz1, curx2, scanlineY, curz2);
+        bres(curx1, scanlineY, curz1, curx2, scanlineY, curz2, color);
         curx1 -= invslope1;
         curx2 -= invslope2;
 
@@ -145,30 +145,90 @@ void drawTop(vertex v1, vertex v2, vertex v3) {
 void drawTriangle(vertex vertex1, vertex vertex2, vertex vertex3) {
     vertex* ordered = getOrderedVertices(vertex1, vertex2, vertex3);
 
+    long double *color = malloc(3*sizeof(long double));
+    /**
+     * V = o[1] - o[0]
+     * W = o[2] - o[0]
+     * Nx=(Vy∗Wz)−(Vz∗Wy)
+       Ny=(Vz∗Wx)−(Vx∗Wz)
+       Nz=(Vx∗Wy)−(Vy∗Wx)
+     */
+     long double V[3] = {
+             ordered[1].x - ordered[0].x,
+             ordered[1].y - ordered[0].y,
+             ordered[1].z - ordered[0].z
+     };
+
+    long double W[3] = {
+            ordered[2].x - ordered[0].x,
+            ordered[2].y - ordered[0].y,
+            ordered[2].z - ordered[0].z
+    };
+
+    long double normal_triangle[3] = {
+            V[1]*W[2] - V[2]*W[1],
+            V[2]*W[0] - V[0]*W[2],
+            V[0]*W[1] - V[1]*W[0]
+    };
+    long double size = sqrt(pow((double) normal_triangle[0], 2) +
+                                    pow((double) normal_triangle[1], 2) +
+                                    pow((double) normal_triangle[2], 2));
+
+    long double mid_point[3] = {
+            (ordered[0].x + ordered[1].x + ordered[2].x)/3.0,
+            (ordered[0].y + ordered[1].y + ordered[2].y)/3.0,
+            (ordered[0].z + ordered[1].z + ordered[2].z)/3.0,
+    };
+
+    long double light_vector[3] = {250 - mid_point[0], 250 - mid_point[1], 100 - mid_point[2]};
+
+    long double size2 = sqrt(pow((double) light_vector[0], 2) +
+                             pow((double) light_vector[1], 2) +
+                             pow((double) light_vector[2], 2));
+
+    for(int i = 0; i < 3; i++) {
+        normal_triangle[i] = normal_triangle[i]/size;
+        light_vector[i] = light_vector[i]/size2;
+    }
+
+    long double dot_product =
+            normal_triangle[0] * light_vector[0] +
+            normal_triangle[1] * light_vector[1] +
+            normal_triangle[2] * light_vector[2];
+
+    long double col = sqrt(pow(dot_product, 2));
+    color[0] = col*114/255;
+    color[1] = col*64/255;
+    color[2] = col*11/255;
+
     if(ordered[1].y == ordered[2].y) {
-
+        drawBottom(ordered[0], ordered[1], ordered[2], color);
     } else if(ordered[0].y == ordered[1].y) {
-
+        drawTop(ordered[0], ordered[1], ordered[2], color);
     } else {
         vertex vertex4 = {(ordered[0].x + ((ordered[1].y - ordered[0].y) / (ordered[2].y - ordered[0].y)) * (ordered[2].x - ordered[0].x)),
                           ordered[1].y,
                           (ordered[0].z*(ordered[2].y - ordered[1].y) + ordered[2].z*(ordered[1].y-ordered[0].y))/(ordered[2].y - ordered[0].y)};
 
-        drawBottom(ordered[0], ordered[1], vertex4);
-        drawTop(ordered[1], vertex4, ordered[2]);
+        drawBottom(ordered[0], ordered[1], vertex4, color);
+        drawTop(ordered[1], vertex4, ordered[2], color);
 
     }
 
+    bres(vertex1.x, vertex1.y, vertex1.z, vertex2.x, vertex2.y, vertex2.z, color);
+    bres(vertex2.x, vertex2.y, vertex2.z, vertex3.x, vertex3.y, vertex3.z, color);
+    bres(vertex3.x, vertex3.y, vertex3.z, vertex1.x, vertex1.y, vertex1.z, color);
+
 }
 
-int interpolate(long double x, long double x0, long double x1, long double y0, long double y1) {
-    return (int)((y0*(x1-x)+y1*(x-x0))/(x1-x0));
+long double interpolate(long double x, long double x0, long double x1, long double y0, long double y1) {
+    return (y0*(x1-x)+y1*(x-x0))/(x1-x0);
 }
 
-void bres(long double x1,long double y1,long double z1, long double x2,long double y2,long double z2) {
-    int dx, dy, i, e;
-    int incx, incy, inc1, inc2;
-    int x,y,z;
+void bres(long double x1,long double y1,long double z1, long double x2,long double y2,long double z2, long double color[]) {
+    long double dx, dy, i, e;
+    long double incx, incy, inc1, inc2;
+    long double x,y;
 
     dx = x2 - x1;
     dy = y2 - y1;
@@ -183,7 +243,7 @@ void bres(long double x1,long double y1,long double z1, long double x2,long doub
     y=y1;
 
     if(dx > dy) {
-        draw_pixel(x,y, interpolate(x, x1, x2, z1, z2), WHITE);
+        draw_pixel(x,y, interpolate(x, x1, x2, z1, z2), color);
         e = 2*dy - dx;
         inc1 = 2*( dy -dx);
         inc2 = 2*dy;
@@ -196,10 +256,10 @@ void bres(long double x1,long double y1,long double z1, long double x2,long doub
                 e += inc2;
             }
             x += incx;
-            draw_pixel(x,y, interpolate(x, x1, x2, z1, z2), WHITE);
+            draw_pixel(x,y, interpolate(x, x1, x2, z1, z2), color);
         }
     } else {
-        draw_pixel(x,y, interpolate(x, x1, x2, z1, z2), WHITE);
+        draw_pixel(x,y, interpolate(x, x1, x2, z1, z2), color);
         e = 2*dx - dy;
         inc1 = 2*( dx - dy);
         inc2 = 2*dx;
@@ -211,7 +271,7 @@ void bres(long double x1,long double y1,long double z1, long double x2,long doub
                 e += inc2;
             }
             y += incy;
-            draw_pixel(x,y, interpolate(x, x1, x2, z1, z2), WHITE);
+            draw_pixel(x,y, interpolate(x, x1, x2, z1, z2), color);
         }
     }
 }
@@ -229,7 +289,7 @@ void reshape(int width, int height) {
 void renderScene(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glPointSize(2.0);
+    glPointSize(1.0);
     glBegin(GL_POINTS);
     for(int i = 0; i < 500; i++) {
         for(int j = 0; j < 500; j++) {
@@ -493,7 +553,7 @@ void calculateVertex(scene_settings settings) {
 
     matrix mvv3dv = multiplyMatrixByMatrix(translateViewPortMatrix, svv3dv);
     mvv3dv = multiplyMatrixByMatrix(mvv3dv, translateCornerMatrix);
-
+    printMatrix(mvv3dv, "mvv3dv");
     for(int i = 0; i < verticesCount; i++) {
         matrix step_2 = applyTransformation(vertices[i], nper);
         transformedVertices[i].x = step_2.values[0][0];
@@ -526,10 +586,6 @@ void calculateVertex(scene_settings settings) {
         vertex vertex1 = transformedVertices[faces[i].vertices[0]-1];
         vertex vertex2 = transformedVertices[faces[i].vertices[1]-1];
         vertex vertex3 = transformedVertices[faces[i].vertices[2]-1];
-
-        bres(vertex1.x, vertex1.y, vertex1.z, vertex2.x, vertex2.y, vertex2.z);
-        bres(vertex2.x, vertex2.y, vertex2.z, vertex3.x, vertex3.y, vertex3.z);
-        bres(vertex3.x, vertex3.y, vertex3.z, vertex1.x, vertex1.y, vertex1.z);
 
         drawTriangle(vertex1, vertex2, vertex3);
     }
