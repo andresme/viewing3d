@@ -24,6 +24,7 @@ void printMatrix(matrix m, const char *name) {
 
 int verticesCount;
 int facesCount;
+int type = 0;
 
 long double frameBuffer[500][500][3];
 long double zbuffer[500][500];
@@ -34,14 +35,14 @@ polygon *faces;
 
 scene_settings settings;
 
-void bres(long double x1,long double y1,long double z1, long double x2,long double y2,long double z2, long double color[]);
+void bres(int x0, int y0, long double z0, int x1, int y1, long double z1, long double color[]);
 
 void clearBuffer() {
     for(int i = 0; i < 500; i++) {
         for(int j = 0; j < 500; j++) {
-            frameBuffer[i][j][0] = BLACK[0];
-            frameBuffer[i][j][1] = BLACK[1];
-            frameBuffer[i][j][2] = BLACK[2];
+            frameBuffer[i][j][0] = WHITE[0];
+            frameBuffer[i][j][1] = WHITE[1];
+            frameBuffer[i][j][2] = WHITE[2];
             zbuffer[i][j] = -INFINITY;
         }
     }
@@ -117,6 +118,10 @@ void drawBottom(vertex v1, vertex v2, vertex v3, long double color[]) {
         curz1 += z_inc_left;
         curz2 += z_inc_right;
     }
+
+    bres(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, color);
+    bres(v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, color);
+    bres(v3.x, v3.y, v3.z, v1.x, v1.y, v1.z, color);
 }
 
 void drawTop(vertex v1, vertex v2, vertex v3, long double color[]) {
@@ -140,6 +145,9 @@ void drawTop(vertex v1, vertex v2, vertex v3, long double color[]) {
         curz1 += z_inc_left;
         curz2 += z_inc_right;
     }
+    bres(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, color);
+    bres(v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, color);
+    bres(v3.x, v3.y, v3.z, v1.x, v1.y, v1.z, color);
 }
 
 void drawTriangle(vertex vertex1, vertex vertex2, vertex vertex3) {
@@ -197,27 +205,22 @@ void drawTriangle(vertex vertex1, vertex vertex2, vertex vertex3) {
             normal_triangle[2] * light_vector[2];
 
     long double col = sqrt(pow(dot_product, 2));
-    color[0] = col*114/255;
-    color[1] = col*64/255;
-    color[2] = col*11/255;
 
-    if(ordered[1].y == ordered[2].y) {
+    color[0] = col*114.0/255.0;
+    color[1] = col*64.0/255.0;
+    color[2] = col*11.0/255.0;
+
+    if (ordered[1].y == ordered[2].y) {
         drawBottom(ordered[0], ordered[1], ordered[2], color);
-    } else if(ordered[0].y == ordered[1].y) {
+    } else if (ordered[0].y == ordered[1].y) {
         drawTop(ordered[0], ordered[1], ordered[2], color);
     } else {
         vertex vertex4 = {(ordered[0].x + ((ordered[1].y - ordered[0].y) / (ordered[2].y - ordered[0].y)) * (ordered[2].x - ordered[0].x)),
                           ordered[1].y,
-                          (ordered[0].z*(ordered[2].y - ordered[1].y) + ordered[2].z*(ordered[1].y-ordered[0].y))/(ordered[2].y - ordered[0].y)};
-
+                          (ordered[0].z * (ordered[2].y - ordered[1].y) + ordered[2].z * (ordered[1].y - ordered[0].y)) / (ordered[2].y - ordered[0].y)};
         drawBottom(ordered[0], ordered[1], vertex4, color);
         drawTop(ordered[1], vertex4, ordered[2], color);
-
     }
-
-    bres(vertex1.x, vertex1.y, vertex1.z, vertex2.x, vertex2.y, vertex2.z, color);
-    bres(vertex2.x, vertex2.y, vertex2.z, vertex3.x, vertex3.y, vertex3.z, color);
-    bres(vertex3.x, vertex3.y, vertex3.z, vertex1.x, vertex1.y, vertex1.z, color);
 
 }
 
@@ -225,54 +228,18 @@ long double interpolate(long double x, long double x0, long double x1, long doub
     return (y0*(x1-x)+y1*(x-x0))/(x1-x0);
 }
 
-void bres(long double x1,long double y1,long double z1, long double x2,long double y2,long double z2, long double color[]) {
-    long double dx, dy, i, e;
-    long double incx, incy, inc1, inc2;
-    long double x,y;
+void bres(int x0, int y0, long double z0, int x1, int y1, long double z1, long double color[]) {
+    int original = x0;
+    int dx = abs(x1-x0), sx = x0<x1 ? 1 : -1;
+    int dy = abs(y1-y0), sy = y0<y1 ? 1 : -1;
+    int err = (dx>dy ? dx : -dy)/2, e2;
 
-    dx = x2 - x1;
-    dy = y2 - y1;
-
-    if(dx < 0) dx = -dx;
-    if(dy < 0) dy = -dy;
-    incx = 1;
-    if(x2 < x1) incx = -1;
-    incy = 1;
-    if(y2 < y1) incy = -1;
-    x=x1;
-    y=y1;
-
-    if(dx > dy) {
-        draw_pixel(x,y, interpolate(x, x1, x2, z1, z2), color);
-        e = 2*dy - dx;
-        inc1 = 2*( dy -dx);
-        inc2 = 2*dy;
-        for(i = 0; i < dx; i++) {
-            if(e >= 0) {
-                y += incy;
-                e += inc1;
-            }
-            else {
-                e += inc2;
-            }
-            x += incx;
-            draw_pixel(x,y, interpolate(x, x1, x2, z1, z2), color);
-        }
-    } else {
-        draw_pixel(x,y, interpolate(x, x1, x2, z1, z2), color);
-        e = 2*dx - dy;
-        inc1 = 2*( dx - dy);
-        inc2 = 2*dx;
-        for(i = 0; i < dy; i++) {
-            if(e >= 0) {
-                x += incx;
-                e += inc1;
-            } else{
-                e += inc2;
-            }
-            y += incy;
-            draw_pixel(x,y, interpolate(x, x1, x2, z1, z2), color);
-        }
+    for(;;){
+        draw_pixel(x0,y0, interpolate(x0, original, x1, z0, z1), color);
+        if (x0==x1 && y0==y1) break;
+        e2 = err;
+        if (e2 >-dx) { err -= dy; x0 += sx; }
+        if (e2 < dy) { err += dx; y0 += sy; }
     }
 }
 
@@ -293,7 +260,7 @@ void renderScene(void) {
     glBegin(GL_POINTS);
     for(int i = 0; i < 500; i++) {
         for(int j = 0; j < 500; j++) {
-            if(frameBuffer[i][j][0] != 0) {
+            if(frameBuffer[i][j][0] > 0.005) {
                 glColor3f(frameBuffer[i][j][0], frameBuffer[i][j][1], frameBuffer[i][j][2]);
                 glVertex2i(i, j);
             }
@@ -594,6 +561,12 @@ void calculateVertex(scene_settings settings) {
 
 void keyboardInput(unsigned char key, int x, int y) {
     switch(key) {
+        case '1':
+            type = 1;
+            break;
+        case '0':
+            type = 0;
+            break;
         case 'q':
             settings.vpn[0] = settings.vpn[0] * cos(0.1) + settings.vpn[2] * sin(0.1);
             settings.vpn[2] = -settings.vpn[0] * sin(0.1) + settings.vpn[2] * cos(0.1);
