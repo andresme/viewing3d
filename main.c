@@ -150,37 +150,48 @@ void drawTop(vertex v1, vertex v2, vertex v3, long double color[]) {
     bres(v3.x, v3.y, v3.z, v1.x, v1.y, v1.z, color);
 }
 
+
+long double* getNormal(vertex v1, vertex v2, vertex v3) {
+    long double *result = malloc(3 * sizeof(long double));
+    /**
+    * V = o[1] - o[0]
+    * W = o[2] - o[0]
+    * Nx=(Vy∗Wz)−(Vz∗Wy)
+      Ny=(Vz∗Wx)−(Vx∗Wz)
+      Nz=(Vx∗Wy)−(Vy∗Wx)
+    */
+    long double V[3] = {
+            v2.x - v1.x,
+            v2.y - v1.y,
+            v2.z - v1.z
+    };
+
+    long double W[3] = {
+            v3.x - v1.x,
+            v3.y - v1.y,
+            v3.z - v1.z
+    };
+    result[0] = V[1]*W[2] - V[2]*W[1];
+    result[1] = V[2]*W[0] - V[0]*W[2];
+    result[2] = V[0]*W[1] - V[1]*W[0];
+
+    long double size = sqrt(pow((double) result[0], 2) +
+                            pow((double) result[1], 2) +
+                            pow((double) result[2], 2));
+
+    result[0] = result[0] / size;
+    result[1] = result[1] / size;
+    result[2] = result[2] / size;
+
+    return result;
+}
+
 void drawTriangle(vertex vertex1, vertex vertex2, vertex vertex3) {
     vertex* ordered = getOrderedVertices(vertex1, vertex2, vertex3);
 
     long double *color = malloc(3*sizeof(long double));
-    /**
-     * V = o[1] - o[0]
-     * W = o[2] - o[0]
-     * Nx=(Vy∗Wz)−(Vz∗Wy)
-       Ny=(Vz∗Wx)−(Vx∗Wz)
-       Nz=(Vx∗Wy)−(Vy∗Wx)
-     */
-     long double V[3] = {
-             ordered[1].x - ordered[0].x,
-             ordered[1].y - ordered[0].y,
-             ordered[1].z - ordered[0].z
-     };
 
-    long double W[3] = {
-            ordered[2].x - ordered[0].x,
-            ordered[2].y - ordered[0].y,
-            ordered[2].z - ordered[0].z
-    };
-
-    long double normal_triangle[3] = {
-            V[1]*W[2] - V[2]*W[1],
-            V[2]*W[0] - V[0]*W[2],
-            V[0]*W[1] - V[1]*W[0]
-    };
-    long double size = sqrt(pow((double) normal_triangle[0], 2) +
-                                    pow((double) normal_triangle[1], 2) +
-                                    pow((double) normal_triangle[2], 2));
+    long double *normal_triangle = getNormal(vertex1, vertex2, vertex3);
 
     long double mid_point[3] = {
             (ordered[0].x + ordered[1].x + ordered[2].x)/3.0,
@@ -195,7 +206,6 @@ void drawTriangle(vertex vertex1, vertex vertex2, vertex vertex3) {
                              pow((double) light_vector[2], 2));
 
     for(int i = 0; i < 3; i++) {
-        normal_triangle[i] = normal_triangle[i]/size;
         light_vector[i] = light_vector[i]/size2;
     }
 
