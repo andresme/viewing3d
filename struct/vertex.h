@@ -7,10 +7,13 @@ typedef struct vertex {
     long double x;
     long double y;
     long double z;
+    int cantFaces;
+    long double avg_normal[3];
 } vertex;
 
 typedef struct polygon {
     int vertices[3];
+
 } polygon;
 
 matrix applyTransformation(vertex v, matrix transformation);

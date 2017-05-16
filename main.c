@@ -35,7 +35,8 @@ polygon *faces;
 
 scene_settings settings;
 
-void bres(int x0, int y0, long double z0, int x1, int y1, long double z1, long double color[]);
+void bres(int x0, int y0, long double z0, int x1, int y1, long double z1, long double normal1[], long double normal2[]);
+long double interpolate(long double x, long double x0, long double x1, long double y0, long double y1);
 
 void clearBuffer() {
     for(int i = 0; i < 500; i++) {
@@ -96,7 +97,8 @@ vertex* getOrderedVertices(vertex vertex1, vertex vertex2, vertex vertex3) {
     return result;
 }
 
-void drawBottom(vertex v1, vertex v2, vertex v3, long double color[]) {
+void drawBottom(vertex v1, vertex v2, vertex v3) {
+
     long double invslope1 = (v2.x - v1.x) / (v2.y - v1.y);
     long double invslope2 = (v3.x - v1.x) / (v3.y - v1.y);
 
@@ -111,7 +113,19 @@ void drawBottom(vertex v1, vertex v2, vertex v3, long double color[]) {
 
     for (long double scanlineY = v1.y; scanlineY <= v2.y; scanlineY++)
     {
-        bres(curx1, scanlineY, curz1, curx2, scanlineY, curz2, color);
+        long double normal1[3] = {
+            interpolate(scanlineY, v1.y, v2.y, v1.avg_normal[0], v2.avg_normal[0]),
+            interpolate(scanlineY, v1.y, v2.y, v1.avg_normal[1], v2.avg_normal[1]),
+            interpolate(scanlineY, v1.y, v2.y, v1.avg_normal[2], v2.avg_normal[2]),
+        };
+
+        long double normal2[3] = {
+                interpolate(scanlineY, v1.y, v3.y, v1.avg_normal[0], v3.avg_normal[0]),
+                interpolate(scanlineY, v1.y, v3.y, v1.avg_normal[1], v3.avg_normal[1]),
+                interpolate(scanlineY, v1.y, v3.y, v1.avg_normal[2], v3.avg_normal[2]),
+        };
+
+        bres(curx1, scanlineY, curz1, curx2, scanlineY, curz2, normal1, normal2);
         curx1 += invslope1;
         curx2 += invslope2;
 
@@ -119,12 +133,12 @@ void drawBottom(vertex v1, vertex v2, vertex v3, long double color[]) {
         curz2 += z_inc_right;
     }
 
-    bres(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, color);
-    bres(v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, color);
-    bres(v3.x, v3.y, v3.z, v1.x, v1.y, v1.z, color);
+    bres(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, v1.avg_normal, v2.avg_normal);
+    bres(v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, v2.avg_normal, v3.avg_normal);
+    bres(v3.x, v3.y, v3.z, v1.x, v1.y, v1.z, v3.avg_normal, v1.avg_normal);
 }
 
-void drawTop(vertex v1, vertex v2, vertex v3, long double color[]) {
+void drawTop(vertex v1, vertex v2, vertex v3) {
     long double invslope1 = (v3.x - v1.x) / (v3.y - v1.y);
     long double invslope2 = (v3.x - v2.x) / (v3.y - v2.y);
 
@@ -137,17 +151,28 @@ void drawTop(vertex v1, vertex v2, vertex v3, long double color[]) {
     long double z_inc_left = (v1.z - v3.z)/(v1.y - v3.y);
     long double z_inc_right = (v2.z - v3.z)/(v2.y - v3.y);
 
-    for (long double scanlineY = v3.y; scanlineY > v1.y; scanlineY--) {
-        bres(curx1, scanlineY, curz1, curx2, scanlineY, curz2, color);
+    for (long double scanlineY = v3.y; scanlineY >= v1.y; scanlineY--) {
+        long double normal1[3] = {
+                interpolate(scanlineY, v3.y, v1.y, v3.avg_normal[0], v1.avg_normal[0]),
+                interpolate(scanlineY, v3.y, v1.y, v3.avg_normal[1], v1.avg_normal[1]),
+                interpolate(scanlineY, v3.y, v1.y, v3.avg_normal[2], v1.avg_normal[2]),
+        };
+
+        long double normal2[3] = {
+                interpolate(scanlineY, v3.y, v2.y, v3.avg_normal[0], v2.avg_normal[0]),
+                interpolate(scanlineY, v3.y, v2.y, v3.avg_normal[1], v2.avg_normal[1]),
+                interpolate(scanlineY, v3.y, v2.y, v3.avg_normal[2], v2.avg_normal[2]),
+        };
+        bres(curx1, scanlineY, curz1, curx2, scanlineY, curz2, normal1, normal2);
         curx1 -= invslope1;
         curx2 -= invslope2;
 
         curz1 += z_inc_left;
         curz2 += z_inc_right;
     }
-    bres(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, color);
-    bres(v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, color);
-    bres(v3.x, v3.y, v3.z, v1.x, v1.y, v1.z, color);
+    bres(v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, v1.avg_normal, v2.avg_normal);
+    bres(v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, v2.avg_normal, v3.avg_normal);
+    bres(v3.x, v3.y, v3.z, v1.x, v1.y, v1.z, v3.avg_normal, v1.avg_normal);
 }
 
 
@@ -189,47 +214,21 @@ long double* getNormal(vertex v1, vertex v2, vertex v3) {
 void drawTriangle(vertex vertex1, vertex vertex2, vertex vertex3) {
     vertex* ordered = getOrderedVertices(vertex1, vertex2, vertex3);
 
-    long double *color = malloc(3*sizeof(long double));
-
-    long double *normal_triangle = getNormal(vertex1, vertex2, vertex3);
-
-    long double mid_point[3] = {
-            (ordered[0].x + ordered[1].x + ordered[2].x)/3.0,
-            (ordered[0].y + ordered[1].y + ordered[2].y)/3.0,
-            (ordered[0].z + ordered[1].z + ordered[2].z)/3.0,
-    };
-
-    long double light_vector[3] = {250 - mid_point[0], 250 - mid_point[1], 100 - mid_point[2]};
-
-    long double size2 = sqrt(pow((double) light_vector[0], 2) +
-                             pow((double) light_vector[1], 2) +
-                             pow((double) light_vector[2], 2));
-
-    for(int i = 0; i < 3; i++) {
-        light_vector[i] = light_vector[i]/size2;
-    }
-
-    long double dot_product =
-            normal_triangle[0] * light_vector[0] +
-            normal_triangle[1] * light_vector[1] +
-            normal_triangle[2] * light_vector[2];
-
-    long double col = sqrt(pow(dot_product, 2));
-
-    color[0] = col*114.0/255.0;
-    color[1] = col*64.0/255.0;
-    color[2] = col*11.0/255.0;
-
     if (ordered[1].y == ordered[2].y) {
-        drawBottom(ordered[0], ordered[1], ordered[2], color);
+        drawBottom(ordered[0], ordered[1], ordered[2]);
     } else if (ordered[0].y == ordered[1].y) {
-        drawTop(ordered[0], ordered[1], ordered[2], color);
+        drawTop(ordered[0], ordered[1], ordered[2]);
     } else {
         vertex vertex4 = {(ordered[0].x + ((ordered[1].y - ordered[0].y) / (ordered[2].y - ordered[0].y)) * (ordered[2].x - ordered[0].x)),
                           ordered[1].y,
                           (ordered[0].z * (ordered[2].y - ordered[1].y) + ordered[2].z * (ordered[1].y - ordered[0].y)) / (ordered[2].y - ordered[0].y)};
-        drawBottom(ordered[0], ordered[1], vertex4, color);
-        drawTop(ordered[1], vertex4, ordered[2], color);
+
+        vertex4.avg_normal[0] = interpolate(vertex4.y, ordered[0].y, ordered[2].y, ordered[0].avg_normal[0], ordered[2].avg_normal[0]);
+        vertex4.avg_normal[1] = interpolate(vertex4.y, ordered[0].y, ordered[2].y, ordered[0].avg_normal[1], ordered[2].avg_normal[1]);
+        vertex4.avg_normal[2] = interpolate(vertex4.y, ordered[0].y, ordered[2].y, ordered[0].avg_normal[2], ordered[2].avg_normal[2]);
+
+        drawBottom(ordered[0], ordered[1], vertex4);
+        drawTop(ordered[1], vertex4, ordered[2]);
     }
 
 }
@@ -238,14 +237,41 @@ long double interpolate(long double x, long double x0, long double x1, long doub
     return (y0*(x1-x)+y1*(x-x0))/(x1-x0);
 }
 
-void bres(int x0, int y0, long double z0, int x1, int y1, long double z1, long double color[]) {
+void bres(int x0, int y0, long double z0, int x1, int y1, long double z1, long double normal1[], long double normal2[]) {
     int original = x0;
     int dx = abs(x1-x0), sx = x0<x1 ? 1 : -1;
     int dy = abs(y1-y0), sy = y0<y1 ? 1 : -1;
     int err = (dx>dy ? dx : -dy)/2, e2;
 
     for(;;){
-        draw_pixel(x0,y0, interpolate(x0, original, x1, z0, z1), color);
+        long double current_z = interpolate(x0, original, x1, z0, z1);
+        long double light_vector[3] = {250 - x0, 250 - y0, 100 - current_z};
+
+        long double size = sqrt(pow(light_vector[0],2) + pow(light_vector[1], 2) + pow(light_vector[2],2));
+
+        light_vector[0] = light_vector[0] / size;
+        light_vector[1] = light_vector[1] / size;
+        light_vector[2] = light_vector[2] / size;
+
+        long double pixel_normal[3] = {
+                interpolate(x0, original, x1, normal1[0], normal2[0]),
+                interpolate(x0, original, x1, normal1[1], normal2[1]),
+                interpolate(x0, original, x1, normal1[2], normal2[2]),
+        };
+
+        long double dot_product =
+                pixel_normal[0] * light_vector[0] +
+                pixel_normal[1] * light_vector[1] +
+                pixel_normal[2] * light_vector[2];
+
+        long double intensity = sqrt(pow(dot_product, 2));
+
+        long double color[3] = {
+                intensity*114.0/255.0,
+                intensity*64.0/255.0,
+                intensity*11.0/255.0,
+        };
+        draw_pixel(x0,y0, current_z, color);
         if (x0==x1 && y0==y1) break;
         e2 = err;
         if (e2 >-dx) { err -= dy; x0 += sx; }
@@ -541,6 +567,25 @@ void calculateVertex(scene_settings settings) {
         vertex vertex1 = transformedVertices[faces[i].vertices[0]-1];
         vertex vertex2 = transformedVertices[faces[i].vertices[1]-1];
         vertex vertex3 = transformedVertices[faces[i].vertices[2]-1];
+
+        long double *normal = getNormal(vertex1, vertex2, vertex3);
+
+        transformedVertices[faces[i].vertices[0]-1].avg_normal[0] += normal[0];
+        transformedVertices[faces[i].vertices[1]-1].avg_normal[0] += normal[0];
+        transformedVertices[faces[i].vertices[2]-1].avg_normal[0] += normal[0];
+
+        transformedVertices[faces[i].vertices[0]-1].avg_normal[1] += normal[1];
+        transformedVertices[faces[i].vertices[1]-1].avg_normal[1] += normal[1];
+        transformedVertices[faces[i].vertices[2]-1].avg_normal[1] += normal[1];
+
+        transformedVertices[faces[i].vertices[0]-1].avg_normal[2] += normal[2];
+        transformedVertices[faces[i].vertices[1]-1].avg_normal[2] += normal[2];
+        transformedVertices[faces[i].vertices[2]-1].avg_normal[2] += normal[2];
+
+        transformedVertices[faces[i].vertices[0]-1].cantFaces++;
+        transformedVertices[faces[i].vertices[1]-1].cantFaces++;
+        transformedVertices[faces[i].vertices[2]-1].cantFaces++;
+
         int accept1 = 0;
         int accept2 = 0;
         int accept3 = 0;
@@ -557,12 +602,25 @@ void calculateVertex(scene_settings settings) {
     }
     for(int i = 0; i < verticesCount; i++) {
         transformedVertices[i] = applyAll(transformedVertices[i], mper, mvv3dv);
+
     }
 
     for(int i = 0; i < facesCount; i++) {
         vertex vertex1 = transformedVertices[faces[i].vertices[0]-1];
         vertex vertex2 = transformedVertices[faces[i].vertices[1]-1];
         vertex vertex3 = transformedVertices[faces[i].vertices[2]-1];
+
+        vertex1.avg_normal[0] = vertex1.avg_normal[0]/(long double) vertex1.cantFaces;
+        vertex1.avg_normal[1] = vertex1.avg_normal[1]/(long double) vertex1.cantFaces;
+        vertex1.avg_normal[2] = vertex1.avg_normal[2]/(long double) vertex1.cantFaces;
+
+        vertex2.avg_normal[0] = vertex2.avg_normal[0]/(long double) vertex2.cantFaces;
+        vertex2.avg_normal[1] = vertex2.avg_normal[1]/(long double) vertex2.cantFaces;
+        vertex2.avg_normal[2] = vertex2.avg_normal[2]/(long double) vertex2.cantFaces;
+
+        vertex3.avg_normal[0] = vertex3.avg_normal[0]/(long double) vertex3.cantFaces;
+        vertex3.avg_normal[1] = vertex3.avg_normal[1]/(long double) vertex3.cantFaces;
+        vertex3.avg_normal[2] = vertex3.avg_normal[2]/(long double) vertex3.cantFaces;
 
         drawTriangle(vertex1, vertex2, vertex3);
     }
