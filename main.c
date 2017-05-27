@@ -13,13 +13,13 @@ long double WHITE[] = {1, 1, 1};
 long double BLACK[] = {0, 0, 0};
 
 void printMatrix(matrix m, const char *name) {
-    printf("======%s======\n", name);
-    for(int i = 0; i < m.height; i++) {
-        for(int j = 0; j < m.width; j++) {
-            printf("%Lf\t",m.values[i][j]);
-        }
-        printf("\n");
-    }
+//    printf("======%s======\n", name);
+//    for(int i = 0; i < m.height; i++) {
+//        for(int j = 0; j < m.width; j++) {
+//            printf("%Lf\t",m.values[i][j]);
+//        }
+//        printf("\n");
+//    }
 }
 
 int verticesCount;
@@ -34,6 +34,13 @@ vertex *transformedVertices;
 polygon *faces;
 
 scene_settings settings;
+
+long double Ip = 0.6;
+long double Kd = 0.9;
+long double Ia = 0.9;
+long double Ka = 0.1;
+long double specular = 0.08;
+long double Ks = 0.3;
 
 void bres(int x0, int y0, long double z0, int x1, int y1, long double z1, long double normal1[], long double normal2[]);
 long double interpolate(long double x, long double x0, long double x1, long double y0, long double y1);
@@ -234,7 +241,16 @@ void drawTriangle(vertex vertex1, vertex vertex2, vertex vertex3) {
 }
 
 long double interpolate(long double x, long double x0, long double x1, long double y0, long double y1) {
+
+    if(x1 == x0) {
+        return y0;
+    }
+
     return (y0*(x1-x)+y1*(x-x0))/(x1-x0);
+}
+
+long double min(long double l1, long double l2) {
+    return l1 < l2 ? l1 : l2;
 }
 
 void bres(int x0, int y0, long double z0, int x1, int y1, long double z1, long double normal1[], long double normal2[]) {
@@ -245,9 +261,18 @@ void bres(int x0, int y0, long double z0, int x1, int y1, long double z1, long d
 
     for(;;){
         long double current_z = interpolate(x0, original, x1, z0, z1);
-        long double light_vector[3] = {250 - x0, 250 - y0, 100 - current_z};
+
+        long double light[3] = {100, 100, 100};
+
+        long double light_vector[3] = {light[0] - x0, light[1] - y0, light[2] - current_z};
 
         long double size = sqrt(pow(light_vector[0],2) + pow(light_vector[1], 2) + pow(light_vector[2],2));
+
+        long double distanceToLight = sqrt(pow(light_vector[0], 2) + pow(light_vector[1], 2) + pow(light_vector[2], 2));
+
+        long double c[3] = {1.0, 0.002, 0.0000001};
+
+        long double factAtt = 1/(c[0]+(c[1]*distanceToLight)+(c[2]*pow(distanceToLight, 2)));
 
         light_vector[0] = light_vector[0] / size;
         light_vector[1] = light_vector[1] / size;
@@ -264,13 +289,46 @@ void bres(int x0, int y0, long double z0, int x1, int y1, long double z1, long d
                 pixel_normal[1] * light_vector[1] +
                 pixel_normal[2] * light_vector[2];
 
-        long double intensity = sqrt(pow(dot_product, 2));
+//        if(dot_product > 0){
+//            printf("dot product: %Lf\n", dot_product);
+//            printf("p.x: %Lf, p.y: %Lf, p.z: %Lf\n", pixel_normal[0], pixel_normal[1], pixel_normal[2]);
+//        }
 
-        long double color[3] = {
-                intensity*114.0/255.0,
-                intensity*64.0/255.0,
-                intensity*11.0/255.0,
+
+        long double intensity = dot_product;
+        if(intensity < 0) {
+            intensity = 0;
+        }
+
+        long double R[3] = {
+                (2 * pixel_normal[0] * dot_product) - light_vector[0],
+                (2 * pixel_normal[1] * dot_product) - light_vector[1],
+                (2 * pixel_normal[2] * dot_product) - light_vector[2]
         };
+
+
+        long double specularDotProduct =
+                        R[0] * light_vector[0] +
+                        R[1] * light_vector[1] +
+                        R[2] * light_vector[2];
+
+
+        intensity = (Ia * Ka) + factAtt * (Ip * Kd * intensity);
+        long double E = Ks * pow(specularDotProduct, specular) * factAtt * Ip;
+        E = min(1, E);
+        intensity = min(1, intensity);
+        long double color[3] = {
+                (intensity*114.0/255.0),
+                (intensity*64.0/255.0),
+                (intensity*11.0/255.0),
+        };
+        if(E > 0) {
+//            printf("E: %Lf\n", specularDotProduct);
+            color[0] = color[0] + (E*(1-color[0]));
+            color[1] = color[1] + (E*(1-color[1]));
+            color[2] = color[2] + (E*(1-color[2]));
+        }
+
         draw_pixel(x0,y0, current_z, color);
         if (x0==x1 && y0==y1) break;
         e2 = err;
@@ -467,10 +525,14 @@ void calculateVertex(scene_settings settings) {
     vrp.values[0][1] = settings.vrp[1];
     vrp.values[0][2] = settings.vrp[2];
 
+    printMatrix(vrp, "vrp");
+
     matrix vpn = initVector(3);
     vpn.values[0][0] = settings.vpn[0];
     vpn.values[0][1] = settings.vpn[1];
     vpn.values[0][2] = settings.vpn[2];
+
+    printMatrix(vpn, "vpn");
 
     matrix vup = initVector(3);
     vup.values[0][0] = settings.vup[0];
@@ -478,11 +540,15 @@ void calculateVertex(scene_settings settings) {
     vup.values[0][2] = settings.vup[2];
     vup = normalizeVector(vup);
 
+    printMatrix(vup, "vup");
+
     matrix prp = initVector(3);
     prp.values[0][0] = settings.prp[0];
     prp.values[0][1] = settings.prp[1];
     prp.values[0][2] = settings.prp[2];
     matrix prpH = getHomogeneousVector(prp);
+
+    printMatrix(prp, "prp");
 
     long double window[] = {settings.window[0], settings.window[1],
                             settings.window[2], settings.window[3]};
@@ -556,12 +622,16 @@ void calculateVertex(scene_settings settings) {
 
     matrix mvv3dv = multiplyMatrixByMatrix(translateViewPortMatrix, svv3dv);
     mvv3dv = multiplyMatrixByMatrix(mvv3dv, translateCornerMatrix);
-    printMatrix(mvv3dv, "mvv3dv");
     for(int i = 0; i < verticesCount; i++) {
         matrix step_2 = applyTransformation(vertices[i], nper);
         transformedVertices[i].x = step_2.values[0][0];
         transformedVertices[i].y = step_2.values[0][1];
         transformedVertices[i].z = step_2.values[0][2];
+
+        transformedVertices[i].avg_normal[0] = 0;
+        transformedVertices[i].avg_normal[1] = 0;
+        transformedVertices[i].avg_normal[2] = 0;
+        transformedVertices[i].cantFaces = 0;
     }
     for(int i = 0; i < facesCount; i++){
         vertex vertex1 = transformedVertices[faces[i].vertices[0]-1];
@@ -586,18 +656,18 @@ void calculateVertex(scene_settings settings) {
         transformedVertices[faces[i].vertices[1]-1].cantFaces++;
         transformedVertices[faces[i].vertices[2]-1].cantFaces++;
 
-        int accept1 = 0;
-        int accept2 = 0;
-        int accept3 = 0;
-        clip3d(&vertex1.x, &vertex1.y, &vertex1.z,
-               &vertex2.x, &vertex2.y, &vertex2.z,
-               &zmin, &accept1);
-        clip3d(&vertex2.x, &vertex2.y, &vertex2.z,
-               &vertex3.x, &vertex3.y, &vertex3.z,
-               &zmin, &accept2);
-        clip3d(&vertex3.x, &vertex3.y, &vertex3.z,
-               &vertex1.x, &vertex1.y, &vertex1.z,
-               &zmin, &accept3);
+//        int accept1 = 0;
+//        int accept2 = 0;
+//        int accept3 = 0;
+//        clip3d(&vertex1.x, &vertex1.y, &vertex1.z,
+//               &vertex2.x, &vertex2.y, &vertex2.z,
+//               &zmin, &accept1);
+//        clip3d(&vertex2.x, &vertex2.y, &vertex2.z,
+//               &vertex3.x, &vertex3.y, &vertex3.z,
+//               &zmin, &accept2);
+//        clip3d(&vertex3.x, &vertex3.y, &vertex3.z,
+//               &vertex1.x, &vertex1.y, &vertex1.z,
+//               &zmin, &accept3);
 
     }
     for(int i = 0; i < verticesCount; i++) {
