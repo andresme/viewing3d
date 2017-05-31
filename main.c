@@ -13,6 +13,8 @@
 long double WHITE[] = {1, 1, 1};
 long double BLACK[] = {0, 0, 0};
 
+char* fileName;
+
 void printMatrix(matrix m, const char *name) {
 //    printf("======%s======\n", name);
 //    for(int i = 0; i < m.height; i++) {
@@ -427,7 +429,7 @@ void count() {
     verticesCount = 0;
     facesCount = 0;
 
-    fp = fopen("/home/andres/viewing3d/config/poly.tri", "r");
+    fp = fopen(fileName, "r");
     if (fp == NULL)
         exit(EXIT_FAILURE);
 
@@ -450,7 +452,7 @@ void readVertex(vertex *vertices) {
     char *vertexDefinition;
     int i = 0;
 
-    fp = fopen("/home/andres/viewing3d/config/poly.tri", "r");
+    fp = fopen(fileName, "r");
     if (fp == NULL)
         exit(EXIT_FAILURE);
 
@@ -481,7 +483,7 @@ void readFaces(polygon *faces) {
     char *vertex3;
     int i = 0;
 
-    fp = fopen("/home/andres/viewing3d/config/poly.tri", "r");
+    fp = fopen(fileName, "r");
     if (fp == NULL)
         exit(EXIT_FAILURE);
 
@@ -802,11 +804,20 @@ void keyboardInput(unsigned char key, int x, int y) {
 }
 
 int main(int argc, char **argv) {
+    
+    fileName = "/home/andres/viewing3d/config/poly.tri";
+//    fileName = "/home/andres/viewing3d/config/poly2.tri";
+//    fileName = "/home/andres/viewing3d/config/poly3.tri";
 
     double p0[3] = {0, 0, 50};
     double p1[3] = {50, 100, -20};
     double p2[3] = {-50, -100, -40};
     double p3[3] = {0, 0, 50};
+
+//    double p0[3] = {0, 0, 10};
+//    double p1[3] = {50, 100, -10};
+//    double p2[3] = {-50, -100, -10};
+//    double p3[3] = {0, 0, 10};
 
     path = bezier(p0, p1, p2, p3);
 
