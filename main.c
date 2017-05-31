@@ -7,7 +7,8 @@
 #include "struct/settings.h"
 #include <math.h>
 #include <values.h>
-
+#include <unistd.h>
+#include <time.h>
 
 long double WHITE[] = {1, 1, 1};
 long double BLACK[] = {0, 0, 0};
@@ -25,9 +26,14 @@ void printMatrix(matrix m, const char *name) {
 int verticesCount;
 int facesCount;
 int type = 0;
+int pathSize = 100;
 
 long double frameBuffer[500][500][3];
 long double zbuffer[500][500];
+
+
+
+unsigned char movements[] = {'1', '2', '3', '4', '5', '6'};
 
 vertex *vertices;
 vertex *transformedVertices;
@@ -35,12 +41,39 @@ polygon *faces;
 
 scene_settings settings;
 
-long double Ip = 0.6;
+long double Ip = 0.8;
 long double Kd = 0.9;
 long double Ia = 0.9;
 long double Ka = 0.1;
 long double specular = 0.08;
 long double Ks = 0.3;
+
+double **path;
+int currentSteps = 0;
+
+double** bezier(double p0[],double p1[],double p2[],double p3[]){
+
+    int size = pathSize;
+
+    double **path = (double**) malloc(size * sizeof(double *));
+
+    for(int i = 0; i < size; i++) {
+        path[i] = (double *) malloc(3 * sizeof(double));
+    }
+
+    double t = 0;
+    int amount = 0;
+
+    while(amount < size) {
+        t += 1.0/(float)size;
+        path[amount][0] = (p0[0]* pow((1-t),3))+((3*p1[0])*t*pow((1-t),2))+(3*p2[0]*(1-t)*pow(t,2))+(p3[0]*pow(t,3));
+        path[amount][1] = (p0[1]* pow((1-t),3))+((3*p1[1])*t*pow((1-t),2))+(3*p2[1]*(1-t)*pow(t,2))+(p3[1]*pow(t,3));
+        path[amount][2] = (p0[2]* pow((1-t),3))+((3*p1[2])*t*pow((1-t),2))+(3*p2[2]*(1-t)*pow(t,2))+(p3[2]*pow(t,3));
+        amount++;
+    }
+
+    return path;
+}
 
 void bres(int x0, int y0, long double z0, int x1, int y1, long double z1, long double normal1[], long double normal2[]);
 long double interpolate(long double x, long double x0, long double x1, long double y0, long double y1);
@@ -362,6 +395,29 @@ void renderScene(void) {
     }
     glEnd();
     glutSwapBuffers();
+
+    double *current = path[currentSteps];
+    currentSteps = (currentSteps+1)%pathSize;
+    double *next = path[currentSteps];
+
+    double sumX = next[0] - current[0];
+    double sumY = next[1] - current[1];
+    double sumZ = next[2] - current[2];
+
+    settings.vrp[0] += sumX;
+    settings.vrp[1] += sumY;
+    settings.vrp[2] += sumZ;
+
+    settings.prp[0] -= sumX;
+    settings.prp[1] -= sumY;
+    settings.prp[2] -= sumZ;
+
+    settings.vpn[0] = settings.vrp[0];
+    settings.vpn[1] = settings.vrp[1];
+    settings.vpn[2] = settings.vrp[2];
+
+    calculateVertex(settings);
+    glutPostRedisplay();
 }
 
 void count() {
@@ -531,6 +587,7 @@ void calculateVertex(scene_settings settings) {
     vpn.values[0][0] = settings.vpn[0];
     vpn.values[0][1] = settings.vpn[1];
     vpn.values[0][2] = settings.vpn[2];
+    vpn = normalizeVector(vpn);
 
     printMatrix(vpn, "vpn");
 
@@ -540,7 +597,7 @@ void calculateVertex(scene_settings settings) {
     vup.values[0][2] = settings.vup[2];
     vup = normalizeVector(vup);
 
-    printMatrix(vup, "vup");
+//    printMatrix(vup, "vup");
 
     matrix prp = initVector(3);
     prp.values[0][0] = settings.prp[0];
@@ -548,7 +605,7 @@ void calculateVertex(scene_settings settings) {
     prp.values[0][2] = settings.prp[2];
     matrix prpH = getHomogeneousVector(prp);
 
-    printMatrix(prp, "prp");
+//    printMatrix(prp, "prp");
 
     long double window[] = {settings.window[0], settings.window[1],
                             settings.window[2], settings.window[3]};
@@ -700,36 +757,28 @@ void calculateVertex(scene_settings settings) {
 void keyboardInput(unsigned char key, int x, int y) {
     switch(key) {
         case '1':
-            type = 1;
+            settings.vrp[0] += 1;
+            settings.prp[0] -= 1;
             break;
-        case '0':
-            type = 0;
+        case '2':
+            settings.vrp[1] += 1;
+            settings.prp[1] -= 1;
             break;
-        case 'q':
-            settings.vpn[0] = settings.vpn[0] * cos(0.1) + settings.vpn[2] * sin(0.1);
-            settings.vpn[2] = -settings.vpn[0] * sin(0.1) + settings.vpn[2] * cos(0.1);
-            settings.vrp[0] = settings.vrp[0] * cos(0.1) + settings.vrp[2] * sin(0.1);
-            settings.vrp[2] = -settings.vrp[0] * sin(0.1) + settings.vrp[2] * cos(0.1);
-            break;
-        case 'w':
-            settings.vpn[0] = settings.vpn[0] * cos(-0.1) + settings.vpn[2] * sin(-0.1);
-            settings.vpn[2] = -settings.vpn[0] * sin(-0.1) + settings.vpn[2] * cos(-0.1);
-            settings.vrp[0] = settings.vrp[0] * cos(-0.1) + settings.vrp[2] * sin(-0.1);
-            settings.vrp[2] = -settings.vrp[0] * sin(-0.1) + settings.vrp[2] * cos(-0.1);
-            break;
-        case 'y':
-            settings.vrp[2] -= 1;
-            break;
-        case 'u':
+        case '3':
             settings.vrp[2] += 1;
+            settings.prp[2] -= 1;
             break;
-        case 'a':
-            settings.vup[0] = settings.vup[0] * cos(0.1) - settings.vup[1] * sin(0.1);
-            settings.vup[1] = settings.vup[0] * sin(0.1) + settings.vup[1] * cos(0.1);
+        case '4':
+            settings.vrp[0] -= 1;
+            settings.prp[0] += 1;
             break;
-        case 's':
-            settings.vup[0] = settings.vup[0] * cos(-0.1) - settings.vup[1] * sin(-0.1);
-            settings.vup[1] = settings.vup[0] * sin(-0.1) + settings.vup[1] * cos(-0.1);
+        case '5':
+            settings.vrp[1] -= 1;
+            settings.prp[1] += 1;
+            break;
+        case '6':
+            settings.vrp[2] -= 1;
+            settings.prp[2] += 1;
             break;
         case 'z':
             settings.vpn[0] = 0;
@@ -745,11 +794,22 @@ void keyboardInput(unsigned char key, int x, int y) {
         default:
             break;
     }
+//    settings.vpn[0] = settings.vrp[0];
+//    settings.vpn[1] = settings.vrp[1];
+//    settings.vpn[2] = settings.vrp[2];
     calculateVertex(settings);
     glutPostRedisplay();
 }
 
 int main(int argc, char **argv) {
+
+    double p0[3] = {0, 0, 50};
+    double p1[3] = {50, 100, -20};
+    double p2[3] = {-50, -100, -40};
+    double p3[3] = {0, 0, 50};
+
+    path = bezier(p0, p1, p2, p3);
+
     count();
     vertices = malloc(verticesCount * sizeof(vertex));
     transformedVertices = malloc(verticesCount * sizeof(vertex));

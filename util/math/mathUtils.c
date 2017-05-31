@@ -41,7 +41,6 @@ matrix multiplyMatrixByMatrix(matrix m1, matrix m2) {
             }
         }
     }
-
     return result;
 }
 
